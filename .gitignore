@@ -1,4 +1,4 @@
 node_modules
-key.env
+.env
 package-lock.json
 package.json.*
