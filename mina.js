@@ -1,3 +1,30 @@
+function timeConvert(stamp) {
+	let zero = (number) => {
+		return (number < 10) ? "0" : ""
+	}
+	let months = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"]
+	let instaStamp = new Date(stamp*1000)
+	let obj = new Date(instaStamp)
+	let today = new Date()
+	let hrs = obj.getHours()
+	let min = obj.getMinutes()
+	let sec = obj.getSeconds()
+	let year = obj.getFullYear()
+	let month = obj.getMonth()
+	let realmonth = months[month]
+	let date = obj.getDate()
+	let time = hrs + ":" + zero(min) + min
+	if (today.getMonth() == instaStamp.getMonth()) {
+		if (today.getDate() == instaStamp.getDate()) {
+			return ["Heute",time]
+		}
+		if (today.getDate() == instaStamp.getDate()-1) {
+			return ["Gestern",time]
+		}
+	}
+	return [date + ". " + realmonth + " " + year,time]
+}
+
 function get_instagram() {
 	// GETs raw HTML, looks for window._sharedData which points to the JSON data I want
 	// definitely subject to change
@@ -36,9 +63,9 @@ function get_instagram() {
 								var type = newContent["__typename"]
 								var thumb_src = newContent["thumbnail_src"]
 								const canvas = Canvas.createCanvas(640,640);
-	              const ctx = canvas.getContext('2d');
-                const background = await Canvas.loadImage(thumb_src);
-	              ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+							  const ctx = canvas.getContext('2d');
+								const background = await Canvas.loadImage(thumb_src);
+							  ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 								var shortcode = newContent["shortcode"]
 								var thisTime = timeConvert(newContent["taken_at_timestamp"])
 								stringtoPost = "Neuer Instagram-Post von Mina (" + thisTime[0] + ", " + thisTime[1] + "): <https://www.instagram.com/p/" + shortcode + "/>"

@@ -9,7 +9,6 @@ var evil, tahc
 var scaruffi = new RegExp('beatles', 'i');
 var beatles = new RegExp('scaruffi', 'i');
 var me = new RegExp('(^| )link([-,!.? ]|$)','i');
-var lastInstaTimestamp = -1
 var lastSoso = -1
 
 bot.on("ready", () => {
@@ -27,33 +26,6 @@ function rando(max,min) {
 
 function htmlDecode(value) {
 	return $("<div/>").html(value).text();
-}
-
-function timeConvert(stamp) {
-	let zero = (number) => {
-		return (number < 10) ? "0" : ""
-	}
-	let months = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"]
-	let instaStamp = new Date(stamp*1000)
-	let obj = new Date(instaStamp)
-	let today = new Date()
-	let hrs = obj.getHours()
-	let min = obj.getMinutes()
-	let sec = obj.getSeconds()
-	let year = obj.getFullYear()
-	let month = obj.getMonth()
-	let realmonth = months[month]
-	let date = obj.getDate()
-	let time = hrs + ":" + zero(min) + min
-	if (today.getMonth() == instaStamp.getMonth()) {
-		if (today.getDate() == instaStamp.getDate()) {
-			return ["Heute",time]
-		}
-		if (today.getDate() == instaStamp.getDate()-1) {
-			return ["Gestern",time]
-		}
-	}
-	return [date + ". " + realmonth + " " + year,time]
 }
 
 function findKeyinJSON(obj,key) {
@@ -86,7 +58,7 @@ function findKeyinJSON(obj,key) {
 
 function getSoSo() {
 	request.get("https://oc.mymovies.dk/em2thejay/addeddate:desc", async (err,res,body) => {
-		if (err) { return console.log(err)}
+		if (err) { return console.log(err) }
 		if (res.statusCode == 200) {
 			let rawHtml = body
 			$ = cheerio.load(rawHtml)
@@ -94,7 +66,7 @@ function getSoSo() {
 			if (titleList.length > 0) {
 				let valuesToPost = []
 				let isFirstElement = true
-        var tempSoso
+				var tempSoso
 				titleList.each((index,element) => {
 					if (index > 4) return false
 					let number = parseInt($(element).find("p").html().trim().substring(1,4))
