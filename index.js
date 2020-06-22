@@ -65,7 +65,7 @@ function search_pics(message,query) {
 			return console.log(err)
 		}
 		if (res.statusCode == 200) {
-			data = JSON.parse(body)
+			let data = JSON.parse(body)
 			if (Array.isArray(data)) {
 				let tmp = query.split(".")
 				let query_noext = tmp[0]
@@ -172,7 +172,7 @@ bot.on("message", async message => {
 						stopped = true
 						setTimeout(() => { stopped = false },3000)
 					} else {
-						await message.channel.send("nicht so schnell")
+						message.channel.send("nicht so schnell")
 					}
 				} else {
 					message.channel.send("suchbegriff zu kurz (min. 3 zeichen)")
