@@ -11,7 +11,6 @@ var scaruffi = new RegExp('beatles', 'i')
 var beatles = new RegExp('scaruffi', 'i')
 var me = new RegExp('(^| )link([-,!.? ]|$)','i')
 var lastSoso = -1
-var newSoso = -1
 var stopped = false
 
 bot.on("ready", () => {
@@ -24,7 +23,6 @@ bot.on("ready", () => {
 	})
 	bot.users.fetch(process.env.EVIL).then(user => { evil = user; evil.send("hi") })
 	bot.channels.fetch(process.env.TAHCID).then(channel => { tahc = channel })
-	getSoSo()
 })
 
 bot.login(process.env.TOKEN)
@@ -133,7 +131,7 @@ function getSoSo() {
 					if (isFirstElement) tempSoso = number
 					isFirstElement = false
 				})
-				newSoso = tempSoso
+				lastSoso = tempSoso
 				if (valuesToPost.length > 0) {
 					valuesToPost.reverse()
 					for (let obj of valuesToPost) {
@@ -141,6 +139,11 @@ function getSoSo() {
 						tahc.send(strToPost)
 						console.log("New post found: "+obj["number"])
 					}
+					let newObj = { soso: lastSoso }
+					let data = JSON.stringify(newObj)
+					fs.writeFile("/tmp/lastValues.json", data, { flag: "w" }, (err) => {
+						if(err) { console.log("fs.writeFile: "+err) }
+					})
 				} else {
 					return console.log("Soso: No new titles found [Last no.: "+lastSoso+"]")
 				}
@@ -220,13 +223,5 @@ bot.on("message", async message => {
 });
 
 var sosotimeout = setInterval(() => {
-	if(newSoso > lastSoso) {
-		let newObj = { soso: newSoso }
-		let data = JSON.stringify(newObj)
-		fs.writeFile("/tmp/lastValues.json", data, { flag: "w" }, (err) => {
-			if(err) { console.log("fs.writeFile: "+err) }
-		})
-		lastSoso = newSoso
-	}
 	getSoSo()
 }, 1200000);
