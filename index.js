@@ -1,21 +1,29 @@
-const { Client, MessageAttachment } = require('discord.js');
-const bot = new Client();
-const request = require('request');
-const cheerio = require('cheerio');
+const { Client, MessageAttachment } = require('discord.js')
+const bot = new Client()
+const fs = require('fs')
+const request = require('request')
+const cheerio = require('cheerio')
 require('dotenv').config()
 const words = require('./words.json')
 
 var evil, tahc
-var scaruffi = new RegExp('beatles', 'i');
-var beatles = new RegExp('scaruffi', 'i');
-var me = new RegExp('(^| )link([-,!.? ]|$)','i');
+var scaruffi = new RegExp('beatles', 'i')
+var beatles = new RegExp('scaruffi', 'i')
+var me = new RegExp('(^| )link([-,!.? ]|$)','i')
 var lastSoso = -1
+var newSoso = -1
 var stopped = false
 
 bot.on("ready", () => {
-	console.log("hi")
-	tahc = bot.channels.fetch(process.env.TAHCID)
-	evil = bot.users.fetch(process.env.EVIL)
+	fs.readFile("/tmp/lastValues.json", (err,data) => {
+		if (err) { console.log("fs.readFile: "+err) }
+		else {
+			let lastvals = JSON.parse(data)
+			lastSoso = lastvals.soso
+		}
+	})
+	bot.users.fetch(process.env.EVIL).then(user => { evil = user; evil.send("hi") })
+	bot.channels.fetch(process.env.TAHCID).then(channel => { tahc = channel })
 	getSoSo()
 })
 
@@ -106,7 +114,7 @@ function search_pics(message,query) {
 
 function getSoSo() {
 	request.get("https://oc.mymovies.dk/em2thejay/addeddate:desc", async (err,res,body) => {
-		if (err) { return console.log(err) }
+		if (err) { return console.log("getSoSo(): "+err) }
 		if (res.statusCode == 200) {
 			let rawHtml = body
 			$ = cheerio.load(rawHtml)
@@ -125,20 +133,24 @@ function getSoSo() {
 					if (isFirstElement) tempSoso = number
 					isFirstElement = false
 				})
-				lastSoso = tempSoso
+				newSoso = tempSoso
 				if (valuesToPost.length > 0) {
+					valuesToPost.reverse()
 					for (let obj of valuesToPost) {
 						let strToPost = 'Soso hat den Titel **' + obj["title"] + '** seiner Sammlung hinzugefügt. Dies ist der **' + obj["number"] + '**. Eintrag in seiner Liste. \:thumbsup:'
 						tahc.send(strToPost)
+						console.log("New post found: "+obj["number"])
 					}
 				} else {
 					return console.log("Soso: No new titles found [Last no.: "+lastSoso+"]")
 				}
 			} else {
-				return console.log("Soso: No titles found")
+				console.log("Soso: No titles found")
+				return false
 			}
 		} else {
-			return console.log("Soso: "+ res.statusCode + ": " + res.statusMessage)
+			console.log("Soso: "+ res.statusCode + ": " + res.statusMessage)
+			return false
 		}
 	})
 }
@@ -208,5 +220,13 @@ bot.on("message", async message => {
 });
 
 var sosotimeout = setInterval(() => {
+	if(newSoso > lastSoso) {
+		let newObj = { soso: newSoso }
+		let data = JSON.stringify(newObj)
+		fs.writeFile("/tmp/lastValues.json", data, { flag: "w" }, (err) => {
+			if(err) { console.log("fs.writeFile: "+err) }
+		})
+		lastSoso = newSoso
+	}
 	getSoSo()
 }, 1200000);
