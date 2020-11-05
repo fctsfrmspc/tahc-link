@@ -139,14 +139,14 @@ function getSoSo() {
 						tahc.send(strToPost)
 						console.log("New post found: "+obj["number"])
 					}
-					let newObj = { soso: lastSoso }
-					let data = JSON.stringify(newObj)
-					fs.writeFile("/tmp/lastValues.json", data, { flag: "w" }, (err) => {
-						if(err) { console.log("fs.writeFile: "+err) }
-					})
 				} else {
-					return console.log("Soso: No new titles found [Last no.: "+lastSoso+"]")
+					console.log("Soso: No new titles found [Last no.: "+lastSoso+"]")
 				}
+				let newObj = { soso: lastSoso }
+				let data = JSON.stringify(newObj)
+				fs.writeFile("/tmp/lastValues.json", data, { flag: "w" }, (err) => {
+					if(err) { console.log("fs.writeFile: "+err) }
+				})
 			} else {
 				console.log("Soso: No titles found")
 				return false
@@ -161,7 +161,11 @@ function getSoSo() {
 bot.on("message", async message => {
 	if(message.author.bot) return;
 	if(message.content.startsWith('!')) {
-		if(message.content.startsWith('!roll')) {
+		if(message.content.startsWith('!sag')) {
+			const saymessage = message.content.substring(4)
+			return tahc.send(saymessage)
+		}
+		else if(message.content.startsWith('!roll')) {
 			const rollmessage = message.content.substring(5)
 			const args = rollmessage.split(",")
 			let num1, num2, rollit
