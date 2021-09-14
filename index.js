@@ -6,16 +6,16 @@ const cheerio = require('cheerio')
 require('dotenv').config()
 const words = require('./words.json')
 
-var evil, tahc
-var scaruffi = new RegExp('beatles', 'i')
-var beatles = new RegExp('scaruffi', 'i')
-var me = new RegExp('(^| )link([-,!.? ]|$)','i')
-var lastSoso = -1
-var stopped = false
+let evil, tahc
+const scaruffi = new RegExp('beatles', 'i')
+const beatles = new RegExp('scaruffi', 'i')
+const me = new RegExp('(^| )link([-,!.? ]|$)','i')
+let lastSoso = -1
+let stopped = false
 
 bot.on("ready", () => {
 	fs.readFile("/tmp/lastValues.json", (err,data) => {
-		if (err) { console.log("fs.readFile: "+err) }
+		if (err) { console.log("fs.readFile: "+err+" (Starting fresh)") }
 		else {
 			let lastvals = JSON.parse(data)
 			lastSoso = lastvals.soso
@@ -31,15 +31,27 @@ function rando(max,min) {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function shuffle(array) {
+    let counter = array.length
+    while (counter > 0) {
+        let index = Math.floor(Math.random() * counter)
+        counter--
+        let temp = array[counter]
+        array[counter] = array[index]
+        array[index] = temp
+    }
+    return array
+}
+
 function htmlDecode(value) {
 	return $("<div/>").html(value).text();
 }
 
 function findKeyinJSON(obj,key) {
-	var result = null
+	let result = null
 	if (obj != null) {
 		if (Array.isArray(obj)) {
-			for(var i=0; i < obj.length; i++) {
+			for(let i=0; i < obj.length; i++) {
 				if(typeof obj[i] == "object") {
 					result = findKeyinJSON(obj[i],key)
 				}
@@ -50,7 +62,7 @@ function findKeyinJSON(obj,key) {
 		} else if (obj.hasOwnProperty(key)) {
 			return obj[key]
 		} else {
-			for(var i=0; i < Object.keys(obj).length; i++) {
+			for(let i=0; i < Object.keys(obj).length; i++) {
 				if(typeof obj[Object.keys(obj)[i]] == "object") {
 					result = findKeyinJSON(obj[Object.keys(obj)[i]],key)
 				}
@@ -120,7 +132,7 @@ function getSoSo() {
 			if (titleList.length > 0) {
 				let valuesToPost = []
 				let isFirstElement = true
-				var tempSoso
+				let tempSoso
 				titleList.each((index,element) => {
 					if (index > 4) return false
 					let number = parseInt($(element).find("p").html().trim().substring(1,4))
@@ -198,6 +210,68 @@ bot.on("message", async message => {
 				}
 			}
 		}
+		else if (message.content.startsWith('!wichteln')) {
+			if(message.author == evil) {
+				const members = ["Carp","Evil","GG","JP","Lamech","Zoly"]
+				const members_random = shuffle([...members]) // clone without ref
+				const mario = ["Mario","DK   ","Luigi","Peach","Wario","Yoshi"]
+				const farben = shuffle([...mario])
+				let members_farben = {}
+				let farben_members = {}
+				let member_ranges = {}
+				for(let i=0; i < members.length; i++) {
+					members_farben[members[i]] = farben[i]
+					farben_members[farben[i]] = members[i]
+				}
+				const others = members.length - 1
+				let all_numbers = {}
+				for(let j=1; j <= members.length*others; j++) {
+					if(j % others == 0) {
+					let ran = Array.from({length: 5}, (_, i) => i + j-others+1)
+					all_numbers[members_random[(j/others)-1]] = shuffle(ran) // must be members_random, otherwise all members would always get the same ranges
+				  }
+				}
+				let linkage = {}
+				let output = ""
+				for(let member of members) {
+					let nums = all_numbers[member]
+					output += member + ": ||" + members_farben[member] + " ("
+					member_ranges[member] = Math.min.apply(null, nums) + "-" + Math.max.apply(null, nums)
+					let o = 0
+					for(let i=0; i < nums.length; i++) {
+						if(members[o] == member) {
+							o++
+						}
+						let other_dude = members[o]
+						output += other_dude + " " + nums[i]
+						if(i < nums.length-1) {
+							output += ", "
+						}
+						o++
+						if(linkage.hasOwnProperty(other_dude)) {
+							linkage[other_dude].push(nums[i])
+						} else {
+							linkage[other_dude] = [nums[i]]
+						}
+					}
+					output += ")||\n"
+				}
+				output += "> **WICHTIG!** Klick nur den Spoiler neben **deinem** Namen an! Notier dir deine Zeile, damit du später weißt, welcher der anderen "+(members.length-1)+" tahc-Member dir zugeteilt wurde!"
+				message.channel.send(output)
+				output = "Für Carp:\n```"
+				for(let farbe of mario) {
+					output += farbe + ": " + member_ranges[farben_members[farbe]] + "\n"
+				}
+				for(let member in linkage) {
+					output += linkage[member].join("=") + "\n"
+				}
+				output += "```"
+				message.channel.send(output)
+			}
+			else {
+				message.channel.send("nope")
+			}
+		}
 		else {
 			message.channel.send(
 				"Verfügbare Kommandos:\n`!roll` - Zufällige Zahl zwischen 1 und 6\n`!roll int x, int y` - Zufällige Zahl zwischen x und y\n`!roll str a, str b, str c...` - Zufälliger String\n`!bild suchbegriff` - Sucht nach einem Bild in /chat/"
@@ -226,6 +300,6 @@ bot.on("message", async message => {
 	}
 });
 
-var sosotimeout = setInterval(() => {
+let sosotimeout = setInterval(() => {
 	getSoSo()
 }, 1200000);
