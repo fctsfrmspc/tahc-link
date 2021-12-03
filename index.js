@@ -176,7 +176,9 @@ bot.on("message", async message => {
 	if(message.content.startsWith('!')) {
 		if(message.content.startsWith('!sag')) {
 			const saymessage = message.content.substring(4)
-			return tahc.send(saymessage)
+			// return tahc.send(saymessage)
+			console.log(message.channel.type)
+			return
 		}
 		else if(message.content.startsWith('!roll')) {
 			const rollmessage = message.content.substring(5)
@@ -212,79 +214,106 @@ bot.on("message", async message => {
 			}
 		}
 		else if (message.content.startsWith('!wichteln')) {
-			if(message.author == evil) {
-				const usage_hint = "Befehl: `!wichteln player1, player2, ..., figur1, figur2, ...`"
-				const wichtelMessage = message.content.substring(10)
-				const args = wichtelMessage.split(",").map(str => str.trim())
-				if(args.length < 4) {
-					message.reply(`Es müssen mindestens zwei Leute teilnehmen! ${usage_hint}`)
-					return
-				}
-				if(args.length % 2 != 0) {
-					message.reply(`Die Anzahl der Spieler und Figuren muss gleich groß sein! ${usage_hint}`)
-					return
-				}
-				const old_wichtel = wichtel["old"]
-				const player_count = args.length/2
-				const players = args.slice(0, player_count)
-				const figures = shuffle(args.slice(player_count))
-				let players_figures = {}
-				for(let i = 0; i < player_count; i++) {
-					players_figures[players[i]] = figures[i]
-				}
-				let all_constells = []
-				for(let player of players) {
-					for(let other_player of players) {
-						if(player != other_player) {
-							if(old_wichtel.hasOwnProperty(player)) {
-								if(!old_wichtel[player].includes(other_player)) {
-									all_constells.push([player, other_player])
+			if(message.channel.type == "dm") {
+				fs.readFile("wichtel_f.json", (err, data) => {
+					if(err) {
+						if(err.code == "ENOENT")
+							message.reply(`Es liegt aktuell keine Zuordnung von Usern und Figuren vor. (ENOENT)`)
+						console.log(err)
+					}
+					else {
+						let figuren = JSON.parse(data)
+						let userid = message.author.id
+						let ids = wichtel["ids"]
+						if(!ids.hasOwnProperty(userid))
+							return message.reply("Unbekannter User. Nimmst du am Wichteln teil? Dann wende dich an Evil.")
+						let this_user = ids[userid]
+						if(!Object.keys(figuren).includes(this_user))
+							return message.reply("Du bist keiner Figur zugeordnet. Nimmst du am Wichteln teil? Dann wende dich an Evil.")
+						let this_figur = figuren[this_user]
+						message.reply(`du bist ${this_figur}.`)
+					}
+				})
+			} else {
+				if(message.author == evil) {
+					const usage_hint = "Befehl: `!wichteln player1, player2, ..., figur1, figur2, ...`"
+					const wichtelMessage = message.content.substring(10)
+					const args = wichtelMessage.split(",").map(str => str.trim())
+					if(args.length < 4) {
+						message.reply(`Es müssen mindestens zwei Leute teilnehmen! ${usage_hint}`)
+						return
+					}
+					if(args.length % 2 != 0) {
+						message.reply(`Die Anzahl der Spieler und Figuren muss gleich groß sein! ${usage_hint}`)
+						return
+					}
+					const old_wichtel = wichtel["old"]
+					const player_count = args.length/2
+					const players = args.slice(0, player_count)
+					const figures = shuffle(args.slice(player_count))
+					let players_figures = {}
+					for(let i = 0; i < player_count; i++) {
+						players_figures[players[i]] = figures[i]
+					}
+					let all_constells = []
+					for(let player of players) {
+						for(let other_player of players) {
+							if(player != other_player) {
+								if(old_wichtel.hasOwnProperty(player)) {
+									if(!old_wichtel[player].includes(other_player)) {
+										all_constells.push([player, other_player])
+									}
+								} else {
+									message.reply(`User "${player}" nicht gefunden! Verfügbare User: ${Object.keys(old_wichtel).join(", ")}`)
+									return
 								}
-							} else {
-								message.reply(`User "${player}" nicht gefunden! Verfügbare User: ${Object.keys(old_wichtel).join(", ")}`)
-								return
 							}
 						}
 					}
-				}
-				const MAX_ITER = 999
-				let i = 1
-				let successful = false
-				let final_constells
-				while(!successful) {
-					final_constells = []
-					backup_players = [[...players], [...players]]
-					all_constells = shuffle(all_constells)
-					for(let constell of all_constells) {
-						if(backup_players[0].includes(constell[0]) && backup_players[1].includes(constell[1])) {
-							final_constells.push(constell)
-							backup_players[0].splice(backup_players[0].indexOf(constell[0]), 1)
-							backup_players[1].splice(backup_players[1].indexOf(constell[1]), 1)
+					const MAX_ITER = 999
+					let i = 1
+					let successful = false
+					let final_constells
+					while(!successful) {
+						final_constells = []
+						backup_players = [[...players], [...players]]
+						all_constells = shuffle(all_constells)
+						for(let constell of all_constells) {
+							if(backup_players[0].includes(constell[0]) && backup_players[1].includes(constell[1])) {
+								final_constells.push(constell)
+								backup_players[0].splice(backup_players[0].indexOf(constell[0]), 1)
+								backup_players[1].splice(backup_players[1].indexOf(constell[1]), 1)
+							}
+							if(final_constells.length == player_count) {
+								successful = true
+								console.log(`wichtel: Found ${player_count} unique constellations after ${i} attempts`)
+								break
+							}
 						}
-						if(final_constells.length == player_count) {
-							successful = true
-							console.log(`wichtel: Found ${player_count} unique constellations after ${i} attempts`)
-							break
+						if(i > MAX_ITER) {
+							console.log(`wichtel: Could not find unique constellations after ${i} attempts`)
+							return
 						}
+						i++
 					}
-					if(i > MAX_ITER) {
-						console.log(`wichtel: Could not find unique constellations after ${i} attempts`)
-						return
+					let stream_output = ""
+					let json_output = {}
+					for(let i = 0; i < player_count; i++) {
+						stream_output += players_figures[final_constells[i][0]] + ": " + final_constells[i][1] + "\n"
+						json_output[players[i]] = players_figures[players[i]]
 					}
-					i++
+					const jsondata = JSON.stringify(json_output)
+					fs.writeFile('wichtel_f.json', jsondata, (err) => {
+						if (err) {
+							throw err
+						}
+						console.log(`Successfully wrote to "wichtel_f.json"`)
+					})
+					message.author.send(stream_output)
+					message.channel.send("done")
+				} else {
+					message.reply("Schreib mich privat an! (Befehl: `!wichteln`)")
 				}
-				let stream_output = ""
-				let tahc_output = ""
-				let this_figure
-				for(let i = 0; i < player_count; i++) {
-					stream_output += players_figures[final_constells[i][0]] + ": " + final_constells[i][1] + "\n"
-					tahc_output += players[i] + " ist ||" + players_figures[players[i]] + "-".repeat(rando(20,10)) + "||\n"
-				}
-				message.author.send(stream_output)
-				tahc.send(tahc_output)
-			}
-			else {
-				message.channel.send("nope")
 			}
 		}
 		else {
