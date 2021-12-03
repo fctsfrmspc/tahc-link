@@ -1,0 +1,11 @@
+{
+	"old": {
+		"Evil": ["Carp"],
+		"Carp": ["Lamech"],
+		"Lamech": ["GG"],
+		"GG": ["JP"],
+		"JP": ["Zoly"],
+		"Zoly": ["Evil"],
+		"Max": []
+	}
+}

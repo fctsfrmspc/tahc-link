@@ -5,6 +5,7 @@ const request = require('request')
 const cheerio = require('cheerio')
 require('dotenv').config()
 const words = require('./words.json')
+const wichtel = require('./wichtel.json')
 
 let evil, tahc
 const scaruffi = new RegExp('beatles', 'i')
@@ -15,7 +16,7 @@ let stopped = false
 
 bot.on("ready", () => {
 	fs.readFile("/tmp/lastValues.json", (err,data) => {
-		if (err) { console.log("fs.readFile: "+err+" (Starting fresh)") }
+		if (err) { console.log(`fs.readFile: ${err} (Starting fresh)`) }
 		else {
 			let lastvals = JSON.parse(data)
 			lastSoso = lastvals.soso
@@ -79,7 +80,7 @@ function search_pics(message,query) {
 	let url = process.env.IMGBASE + "list_json.php"
 	request.get(url, async (err,res,body) => {
 		if (err) { 
-			message.channel.send(process.env.IMGBASE + " nicht erreichbar")
+			message.channel.send(`${process.env.IMGBASE} nicht erreichbar`)
 			return console.log(err)
 		}
 		if (res.statusCode == 200) {
@@ -115,7 +116,7 @@ function search_pics(message,query) {
 					}
 				}
 			} else {
-				message.channel.send(process.env.IMGBASE + " gab keine Liste zurück")
+				message.channel.send(`${process.env.IMGBASE} gab keine Liste zurück`)
 				return console.log(data)
 			}
 		}
@@ -147,24 +148,24 @@ function getSoSo() {
 				if (valuesToPost.length > 0) {
 					valuesToPost.reverse()
 					for (let obj of valuesToPost) {
-						let strToPost = 'Soso hat den Titel **' + obj["title"] + '** seiner Sammlung hinzugefügt. Dies ist der **' + obj["number"] + '**. Eintrag in seiner Liste. \:thumbsup:'
+						let strToPost = `Soso hat den Titel **${obj["title"]}** seiner Sammlung hinzugefügt. Dies ist der **${obj["number"]}**. Eintrag in seiner Liste. \:thumbsup:`
 						tahc.send(strToPost)
-						console.log("New post found: "+obj["number"])
+						console.log(`New post found: ${obj["number"]}`)
 					}
 				} else {
-					console.log("Soso: No new titles found [Last no.: "+lastSoso+"]")
+					console.log(`Soso: No new titles found [Last no.: ${lastSoso}]`)
 				}
 				let newObj = { soso: lastSoso }
 				let data = JSON.stringify(newObj)
 				fs.writeFile("/tmp/lastValues.json", data, { flag: "w" }, (err) => {
-					if(err) { console.log("fs.writeFile: "+err) }
+					if(err) { console.log(`fs.writeFile: ${err}`) }
 				})
 			} else {
 				console.log("Soso: No titles found")
 				return false
 			}
 		} else {
-			console.log("Soso: "+ res.statusCode + ": " + res.statusMessage)
+			console.log(`Soso: ${res.statusCode} : ${res.statusMessage}`)
 			return false
 		}
 	})
@@ -212,61 +213,75 @@ bot.on("message", async message => {
 		}
 		else if (message.content.startsWith('!wichteln')) {
 			if(message.author == evil) {
-				const members = ["Carp","Evil","GG","JP","Lamech","Zoly"]
-				const members_random = shuffle([...members]) // clone without ref
-				const mario = ["Mario","DK   ","Luigi","Peach","Wario","Yoshi"]
-				const farben = shuffle([...mario])
-				let members_farben = {}
-				let farben_members = {}
-				let member_ranges = {}
-				for(let i=0; i < members.length; i++) {
-					members_farben[members[i]] = farben[i]
-					farben_members[farben[i]] = members[i]
+				const usage_hint = "Befehl: `!wichteln player1, player2, ..., figur1, figur2, ...`"
+				const wichtelMessage = message.content.substring(10)
+				const args = wichtelMessage.split(",").map(str => str.trim())
+				if(args.length < 4) {
+					message.reply(`Es müssen mindestens zwei Leute teilnehmen! ${usage_hint}`)
+					return
 				}
-				const others = members.length - 1
-				let all_numbers = {}
-				for(let j=1; j <= members.length*others; j++) {
-					if(j % others == 0) {
-					let ran = Array.from({length: 5}, (_, i) => i + j-others+1)
-					all_numbers[members_random[(j/others)-1]] = shuffle(ran) // must be members_random, otherwise all members would always get the same ranges
-				  }
+				if(args.length % 2 != 0) {
+					message.reply(`Die Anzahl der Spieler und Figuren muss gleich groß sein! ${usage_hint}`)
+					return
 				}
-				let linkage = {}
-				let output = ""
-				for(let member of members) {
-					let nums = all_numbers[member]
-					output += member + ": ||" + members_farben[member] + " ("
-					member_ranges[member] = Math.min.apply(null, nums) + "-" + Math.max.apply(null, nums)
-					let o = 0
-					for(let i=0; i < nums.length; i++) {
-						if(members[o] == member) {
-							o++
-						}
-						let other_dude = members[o]
-						output += other_dude + " " + nums[i]
-						if(i < nums.length-1) {
-							output += ", "
-						}
-						o++
-						if(linkage.hasOwnProperty(other_dude)) {
-							linkage[other_dude].push(nums[i])
-						} else {
-							linkage[other_dude] = [nums[i]]
+				const old_wichtel = wichtel["old"]
+				const player_count = args.length/2
+				const players = args.slice(0, player_count)
+				const figures = shuffle(args.slice(player_count))
+				let players_figures = {}
+				for(let i = 0; i < player_count; i++) {
+					players_figures[players[i]] = figures[i]
+				}
+				let all_constells = []
+				for(let player of players) {
+					for(let other_player of players) {
+						if(player != other_player) {
+							if(old_wichtel.hasOwnProperty(player)) {
+								if(!old_wichtel[player].includes(other_player)) {
+									all_constells.push([player, other_player])
+								}
+							} else {
+								message.reply(`User "${player}" nicht gefunden! Verfügbare User: ${Object.keys(old_wichtel).join(", ")}`)
+								return
+							}
 						}
 					}
-					output += ")||\n"
 				}
-				output += "> **WICHTIG!** Klick nur den Spoiler neben **deinem** Namen an! Notier dir deine Zeile, damit du später weißt, welcher der anderen "+(members.length-1)+" tahc-Member dir zugeteilt wurde!"
-				message.channel.send(output)
-				output = "Für Carp:\n```"
-				for(let farbe of mario) {
-					output += farbe + ": " + member_ranges[farben_members[farbe]] + "\n"
+				const MAX_ITER = 999
+				let i = 1
+				let successful = false
+				let final_constells
+				while(!successful) {
+					final_constells = []
+					backup_players = [[...players], [...players]]
+					all_constells = shuffle(all_constells)
+					for(let constell of all_constells) {
+						if(backup_players[0].includes(constell[0]) && backup_players[1].includes(constell[1])) {
+							final_constells.push(constell)
+							backup_players[0].splice(backup_players[0].indexOf(constell[0]), 1)
+							backup_players[1].splice(backup_players[1].indexOf(constell[1]), 1)
+						}
+						if(final_constells.length == player_count) {
+							successful = true
+							console.log(`wichtel: Found ${player_count} unique constellations after ${i} attempts`)
+							break
+						}
+					}
+					if(i > MAX_ITER) {
+						console.log(`wichtel: Could not find unique constellations after ${i} attempts`)
+						return
+					}
+					i++
 				}
-				for(let member in linkage) {
-					output += linkage[member].join("=") + "\n"
+				let stream_output = ""
+				let tahc_output = ""
+				let this_figure
+				for(let i = 0; i < player_count; i++) {
+					stream_output += players_figures[final_constells[i][0]] + ": " + final_constells[i][1] + "\n"
+					tahc_output += players[i] + " ist ||" + players_figures[players[i]] + "-".repeat(rando(20,10)) + "||\n"
 				}
-				output += "```"
-				message.channel.send(output)
+				message.author.send(stream_output)
+				tahc.send(tahc_output)
 			}
 			else {
 				message.channel.send("nope")
