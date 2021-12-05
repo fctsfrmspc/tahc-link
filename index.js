@@ -223,6 +223,9 @@ bot.on("message", async message => {
 			}
 		}
 		else if (message.content.startsWith('!wichteln')) {
+			const ids = wichtel["ids"]
+			const organisator_id = wichtel["organisator"]
+			const organisator = ids[organisator_id]
 			if(message.channel.type == "dm") {
 				fs.readFile("wichtel_f.json", (err, data) => {
 					if(err) {
@@ -233,18 +236,17 @@ bot.on("message", async message => {
 					else {
 						let figuren = JSON.parse(data)
 						let userid = message.author.id
-						let ids = wichtel["ids"]
 						if(!ids.hasOwnProperty(userid))
-							return message.reply("Unbekannter User. Nimmst du am Wichteln teil? Dann wende dich an Evil.")
+							return message.reply(`Unbekannter User. Nimmst du am Wichteln teil? Dann wende dich an ${organisator}.`)
 						let this_user = ids[userid]
 						if(!Object.keys(figuren).includes(this_user))
-							return message.reply("Du bist keiner Figur zugeordnet. Nimmst du am Wichteln teil? Dann wende dich an Evil.")
+							return message.reply(`Du bist keiner Figur zugeordnet. Nimmst du am Wichteln teil? Dann wende dich an ${organisator}.`)
 						let this_figur = figuren[this_user]
 						message.reply(`du bist ${this_figur}.`)
 					}
 				})
 			} else {
-				if(message.author == evil) {
+				if(message.author.id == organisator_id) {
 					const usage_hint = "Befehl: `!wichteln player1, player2, ..., figur1, figur2, ...`"
 					const wichtelMessage = message.content.substring(10)
 					const args = wichtelMessage.split(",").map(str => str.trim())
