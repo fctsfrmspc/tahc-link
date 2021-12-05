@@ -8,25 +8,22 @@ const words = require('./words.json')
 const wichtel = require('./wichtel.json')
 
 let evil, tahc
+let logi = 0
 const scaruffi = new RegExp('beatles', 'i')
 const beatles = new RegExp('scaruffi', 'i')
 const me = new RegExp('(^| )link([-,!.? ]|$)','i')
 let lastSoso = -1
 let stopped = false
 
-bot.on("ready", () => {
-	fs.readFile("/tmp/lastValues.json", (err,data) => {
-		if (err) { console.log(`fs.readFile: ${err} (Starting fresh)`) }
-		else {
-			let lastvals = JSON.parse(data)
-			lastSoso = lastvals.soso
-		}
-	})
-	bot.users.fetch(process.env.EVIL).then(user => { evil = user; evil.send("hi") })
-	bot.channels.fetch(process.env.TAHCID).then(channel => { tahc = channel })
-})
+let sosotimeout = setInterval(() => {
+	getSoSo()
+}, process.env.SOSOMINUTES * 60000);
 
-bot.login(process.env.TOKEN)
+function log(sender, message) {
+	let date = new Date()
+	console.log(`[${logi}] ${date.toUTCString()}, from ${sender}: ${message}`)
+	logi++
+}
 
 function rando(max,min) {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -81,7 +78,7 @@ function search_pics(message,query) {
 	request.get(url, async (err,res,body) => {
 		if (err) { 
 			message.channel.send(`${process.env.IMGBASE} nicht erreichbar`)
-			return console.log(err)
+			return log("search_pics", err)
 		}
 		if (res.statusCode == 200) {
 			let data = JSON.parse(body)
@@ -117,15 +114,15 @@ function search_pics(message,query) {
 				}
 			} else {
 				message.channel.send(`${process.env.IMGBASE} gab keine Liste zurück`)
-				return console.log(data)
+				return log("search_pics", data)
 			}
 		}
 	})
 }
 
 function getSoSo() {
-	request.get("https://oc.mymovies.dk/em2thejay/addeddate:desc", async (err,res,body) => {
-		if (err) { return console.log("getSoSo(): "+err) }
+	request.get("https://oc.mymovies.dk/em2thejay/collectionNumber:desc", async (err,res,body) => {
+		if (err) { return log("getSoso", err) }
 		if (res.statusCode == 200) {
 			let rawHtml = body
 			$ = cheerio.load(rawHtml)
@@ -150,35 +147,47 @@ function getSoSo() {
 					for (let obj of valuesToPost) {
 						let strToPost = `Soso hat den Titel **${obj["title"]}** seiner Sammlung hinzugefügt. Dies ist der **${obj["number"]}**. Eintrag in seiner Liste. \:thumbsup:`
 						tahc.send(strToPost)
-						console.log(`New post found: ${obj["number"]}`)
+						log("getSoso", obj["number"])
 					}
 				} else {
-					console.log(`Soso: No new titles found [Last no.: ${lastSoso}]`)
+					log("getSoso", `No new titles found [Last no.: ${lastSoso}]`)
 				}
 				let newObj = { soso: lastSoso }
 				let data = JSON.stringify(newObj)
 				fs.writeFile("/tmp/lastValues.json", data, { flag: "w" }, (err) => {
-					if(err) { console.log(`fs.writeFile: ${err}`) }
+					if(err) log("getSoso", err)
 				})
 			} else {
-				console.log("Soso: No titles found")
+				log("getSoso", "No titles found")
 				return false
 			}
 		} else {
-			console.log(`Soso: ${res.statusCode} : ${res.statusMessage}`)
+			log("getSoso", `${res.statusCode} : ${res.statusMessage}`)
 			return false
 		}
 	})
 }
+
+bot.on("ready", () => {
+	fs.readFile("/tmp/lastValues.json", (err,data) => {
+		if (err) { console.log(`fs.readFile: ${err} (Starting fresh)`) }
+		else {
+			let lastvals = JSON.parse(data)
+			lastSoso = lastvals.soso
+		}
+	})
+	bot.users.fetch(process.env.EVIL).then(user => { evil = user; evil.send("hi") })
+	bot.channels.fetch(process.env.TAHCID).then(channel => { tahc = channel })
+})
+
+bot.login(process.env.TOKEN)
 
 bot.on("message", async message => {
 	if(message.author.bot) return;
 	if(message.content.startsWith('!')) {
 		if(message.content.startsWith('!sag')) {
 			const saymessage = message.content.substring(4)
-			// return tahc.send(saymessage)
-			console.log(message.channel.type)
-			return
+			return tahc.send(saymessage)
 		}
 		else if(message.content.startsWith('!roll')) {
 			const rollmessage = message.content.substring(5)
@@ -219,7 +228,7 @@ bot.on("message", async message => {
 					if(err) {
 						if(err.code == "ENOENT")
 							message.reply(`Es liegt aktuell keine Zuordnung von Usern und Figuren vor. (ENOENT)`)
-						console.log(err)
+						log("wichteln", err)
 					}
 					else {
 						let figuren = JSON.parse(data)
@@ -240,11 +249,11 @@ bot.on("message", async message => {
 					const wichtelMessage = message.content.substring(10)
 					const args = wichtelMessage.split(",").map(str => str.trim())
 					if(args.length < 4) {
-						message.reply(`Es müssen mindestens zwei Leute teilnehmen! ${usage_hint}`)
+						message.channel.send(`Es müssen mindestens zwei Leute teilnehmen! ${usage_hint}`)
 						return
 					}
 					if(args.length % 2 != 0) {
-						message.reply(`Die Anzahl der Spieler und Figuren muss gleich groß sein! ${usage_hint}`)
+						message.channel.send(`Die Anzahl der Spieler und Figuren muss gleich groß sein! ${usage_hint}`)
 						return
 					}
 					const old_wichtel = wichtel["old"]
@@ -264,7 +273,7 @@ bot.on("message", async message => {
 										all_constells.push([player, other_player])
 									}
 								} else {
-									message.reply(`User "${player}" nicht gefunden! Verfügbare User: ${Object.keys(old_wichtel).join(", ")}`)
+									message.channel.send(`User "${player}" nicht gefunden! Verfügbare User: ${Object.keys(old_wichtel).join(", ")}`)
 									return
 								}
 							}
@@ -286,12 +295,12 @@ bot.on("message", async message => {
 							}
 							if(final_constells.length == player_count) {
 								successful = true
-								console.log(`wichtel: Found ${player_count} unique constellations after ${i} attempts`)
+								log("wichteln", `wichtel: Found ${player_count} unique constellations after ${i} attempts`)
 								break
 							}
 						}
 						if(i > MAX_ITER) {
-							console.log(`wichtel: Could not find unique constellations after ${i} attempts`)
+							log("wichteln", `Could not find unique constellations after ${i} attempts`)
 							return
 						}
 						i++
@@ -307,18 +316,24 @@ bot.on("message", async message => {
 						if (err) {
 							throw err
 						}
-						console.log(`Successfully wrote to "wichtel_f.json"`)
+						log("wichteln", `Successfully wrote to "wichtel_f.json"`)
 					})
 					message.author.send(stream_output)
 					message.channel.send("done")
 				} else {
-					message.reply("Schreib mich privat an! (Befehl: `!wichteln`)")
+					message.reply("um herauszufinden, welche Figur dir zugeordnet wurde, schreib mich privat mit dem Befehl `!wichteln` an.")
 				}
 			}
 		}
 		else {
 			message.channel.send(
-				"Verfügbare Kommandos:\n`!roll` - Zufällige Zahl zwischen 1 und 6\n`!roll int x, int y` - Zufällige Zahl zwischen x und y\n`!roll str a, str b, str c...` - Zufälliger String\n`!bild suchbegriff` - Sucht nach einem Bild in /chat/"
+				"Verfügbare Kommandos:\n" +
+				"`!roll` - Zufällige Zahl zwischen 1 und 6\n" +
+				"`!roll int x, int y` - Zufällige Zahl zwischen x und y\n" +
+				"`!roll str a, str b, str c...` - Zufälliger String\n" +
+				"`!bild suchbegriff` - Sucht nach einem Bild in /chat/.\n" +
+				"`!sag [...]` - Sag mir, was ich sagen soll.\n" +
+				"`!wichteln` (nur DM) - Welche Figur wurde mir zugeordnet?"
 			)
 		}
 	} else {
@@ -343,7 +358,3 @@ bot.on("message", async message => {
 		}
 	}
 });
-
-let sosotimeout = setInterval(() => {
-	getSoSo()
-}, 1200000);
