@@ -3,6 +3,7 @@ const bot = new Client()
 const fs = require('fs')
 const request = require('request')
 const cheerio = require('cheerio')
+const hltb = require('howlongtobeat')
 require('dotenv').config()
 const words = require('./words.json')
 const wichtel = require('./wichtel.json')
@@ -178,6 +179,59 @@ function getSoSo() {
 	})
 }
 
+function displayHLTBGames(channel, games) {
+	if(games.length === 0) {
+		channel.send('nix gefunden')
+	} else {
+		const game = games[0]
+		const boxart = new MessageAttachment('https://howlongtobeat.com' + game.imageUrl)
+		let output = `**${game.name}**`
+		output += `\nMain: `
+		output += (game.gameplayMain > 0) ? `**${game.gameplayMain}** hours` : `**n/a**`
+		output += `\nMain + Extra: `
+		output += (game.gameplayMainExtra > 0) ? `**${game.gameplayMainExtra}** hours` : `**n/a**`
+		output += `\nCompletionist: `
+		output += (game.gameplayCompletionist > 0) ? `**${game.gameplayCompletionist}** hours` : `**n/a**`
+		channel.send(boxart).then(() => {
+			channel.send(output)
+			if(games.length > 1) {
+				channel.send(`other results: *${showOtherHLTBResults(games)}*`)
+			}
+		})
+	}
+}
+
+function showOtherHLTBResults(games) {
+	let nameList = []
+	for(game of games) {
+		nameList.push(game.name)
+	}
+	nameList.shift()
+	return nameList.join(', ')
+}
+
+function sendHelpMessage(channel) {
+	channel.send(
+		"__Verfügbare Kommandos:__\n" +
+		"`!roll` - Zufällige Zahl zwischen 1 und 6\n" +
+		"`!roll int x, int y` - Zufällige Zahl zwischen x und y\n" +
+		"`!roll str a, str b, str c...` - Zufälliger String\n" +
+		"`!bild suchbegriff` - Sucht nach einem Bild in /chat/.\n" +
+		"`!sag [...]` - Sag mir, was ich sagen soll.\n" +
+		"`!wichtel` (nur DM) - Welche Figur wurde mir zugeordnet?\n" + 
+		"`!howlong spieltitel` - HowLongToBeat.com Suchabfrage\n" + 
+		"__Umfragen:__\n" +
+		"`!poll` - Zeige den Stand der aktuellen Umfrage an.\n" +
+		"`!poll new` - Erstelle eine neue Umfrage (`!poll new Frage; Antwort 1; Antwort 2; ...`)\n" +
+		"`!poll new 2:5 ...` - Multiple-Choice-Umfrage mit mindestens 2 und maximal 5 Stimmen pro Teilnehmer\n" +
+		"`!poll end` - Beende die aktuelle Umfrage und zeige die Ergebnisse an.\n" +
+		"`!poll A` - Stimme für Antwort A ab.\n" +
+		"`!poll unvote` - Ziehe alle von dir abgegebenen Stimmen zurück.\n" +
+		"`!poll extend` - Verlängere die Umfrage um 24 Stunden, ab jetzt.\n" +
+		"Umfragen laufen nach 24 Stunden automatisch ab. Um anonym abzustimmen, verwende die Befehle im privaten Chat mit mir."
+	)
+}
+
 // for polls
 
 function sortPollAfterVotes() {
@@ -333,6 +387,16 @@ bot.on("message", async message => {
 				} else {
 					message.channel.send("suchbegriff zu kurz (min. 3 zeichen)")
 				}
+			}
+		}
+		else if (message.content.startsWith('!howlong')) {
+			const input = message.content.split(' ')
+			if(input.length > 1) {
+				input.shift()
+				let hltbService = new hltb.HowLongToBeatService()
+				hltbService.search(input.join(' ')).then(result => displayHLTBGames(message.channel, result))
+			} else {
+				sendHelpMessage(message.channel)
 			}
 		}
 		else if (message.content.startsWith('!wichtel')) {
@@ -605,24 +669,7 @@ bot.on("message", async message => {
 			}
 		}
 		else {
-			message.channel.send(
-				"__Verfügbare Kommandos:__\n" +
-				"`!roll` - Zufällige Zahl zwischen 1 und 6\n" +
-				"`!roll int x, int y` - Zufällige Zahl zwischen x und y\n" +
-				"`!roll str a, str b, str c...` - Zufälliger String\n" +
-				"`!bild suchbegriff` - Sucht nach einem Bild in /chat/.\n" +
-				"`!sag [...]` - Sag mir, was ich sagen soll.\n" +
-				"`!wichtel` (nur DM) - Welche Figur wurde mir zugeordnet?\n" + 
-				"__Umfragen:__\n" +
-				"`!poll` - Zeige den Stand der aktuellen Umfrage an.\n" +
-				"`!poll new` - Erstelle eine neue Umfrage (`!poll new Frage; Antwort 1; Antwort 2; ...`)\n" +
-				"`!poll new 2:5 ...` - Multiple-Choice-Umfrage mit mindestens 2 und maximal 5 Stimmen pro Teilnehmer\n" +
-				"`!poll end` - Beende die aktuelle Umfrage und zeige die Ergebnisse an.\n" +
-				"`!poll A` - Stimme für Antwort A ab.\n" +
-				"`!poll unvote` - Ziehe alle von dir abgegebenen Stimmen zurück.\n" +
-				"`!poll extend` - Verlängere die Umfrage um 24 Stunden, ab jetzt.\n" +
-				"Umfragen laufen nach 24 Stunden automatisch ab. Um anonym abzustimmen, verwende die Befehle im privaten Chat mit mir."
-			)
+			sendHelpMessage(message.channel)
 		}
 	} else {
 		if(scaruffi.test(message.content)) {
