@@ -186,12 +186,12 @@ function displayHLTBGames(channel, games) {
 		const game = games[0]
 		const boxart = new MessageAttachment('https://howlongtobeat.com' + game.imageUrl)
 		let output = `**${game.name}**`
-		output += `\nMain: `
-		output += (game.gameplayMain > 0) ? `**${game.gameplayMain}** hours` : `**n/a**`
-		output += `\nMain + Extra: `
-		output += (game.gameplayMainExtra > 0) ? `**${game.gameplayMainExtra}** hours` : `**n/a**`
-		output += `\nCompletionist: `
-		output += (game.gameplayCompletionist > 0) ? `**${game.gameplayCompletionist}** hours` : `**n/a**`
+		for(let timeLabel of game.timeLabels) {
+			const key = timeLabel[0]
+			const value = timeLabel[1]
+			output += `\n${value}: `
+			output += (game[key] > 0) ? `**${game[key]}** hours` : `**n/a**`
+		}
 		channel.send(boxart).then(() => {
 			channel.send(output)
 			if(games.length > 1) {
@@ -504,7 +504,7 @@ bot.on("message", async message => {
 			const authorId = message.author.id
 			let nickname = "Anonymous"
 			if(message.channel.type === "text") {
-				nickname = message.channel.members.get(authorId).nickname
+				nickname = message.channel.members.get(authorId).displayName
 			}
 			if(message.content.startsWith('!poll new')) {
 				if(pollRunning) {
