@@ -184,14 +184,17 @@ function displayHLTBGames(channel, games) {
 		channel.send('nix gefunden')
 	} else {
 		const game = games[0]
-		const boxart = new MessageAttachment('https://howlongtobeat.com' + game.imageUrl)
+		const boxart = new MessageAttachment(game.imageUrl)
 		let output = `**${game.name}**`
-		for(let timeLabel of game.timeLabels) {
-			const key = timeLabel[0]
-			const value = timeLabel[1]
-			output += `\n${value}: `
-			output += (game[key] > 0) ? `**${game[key]}** hours` : `**n/a**`
-		}
+		if (game.platforms != null)
+			output += `\n${game.platforms.join(', ')}`
+		// 1.7.0
+		if(game.gameplayMain > 0)
+			output += `\nMain: **${game.gameplayMain}** hours`
+		if(game.gameplayMainExtra > 0)
+			output += `\nMain + Extra: **${game.gameplayMainExtra}** hours`
+		if(game.gameplayCompletionist > 0)
+			output += `\nCompletionist: **${game.gameplayCompletionist}** hours`
 		channel.send(boxart).then(() => {
 			channel.send(output)
 			if(games.length > 1) {
@@ -219,7 +222,7 @@ function sendHelpMessage(channel) {
 		"`!bild suchbegriff` - Sucht nach einem Bild in /chat/.\n" +
 		"`!sag [...]` - Sag mir, was ich sagen soll.\n" +
 		"`!wichtel` (nur DM) - Welche Figur wurde mir zugeordnet?\n" + 
-		"`!howlong spieltitel` - HowLongToBeat.com Suchabfrage\n" + 
+		"`!how spieltitel` - HowLongToBeat.com Suchabfrage\n" + 
 		"__Umfragen:__\n" +
 		"`!poll` - Zeige den Stand der aktuellen Umfrage an.\n" +
 		"`!poll new` - Erstelle eine neue Umfrage (`!poll new Frage; Antwort 1; Antwort 2; ...`)\n" +
@@ -389,7 +392,7 @@ bot.on("message", async message => {
 				}
 			}
 		}
-		else if (message.content.startsWith('!howlong')) {
+		else if (message.content.startsWith('!how') || message.content.startsWith('!hltb')) {
 			const input = message.content.split(' ')
 			if(input.length > 1) {
 				input.shift()
