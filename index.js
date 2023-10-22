@@ -31,9 +31,9 @@ let pollMinAnswers = 1
 let pollMaxAnswers = 1
 let pollChannel = null
 
-let sosotimeout = setInterval(() => {
+/* let sosotimeout = setInterval(() => {
 	getSoSo()
-}, process.env.SOSOMINUTES * 60000);
+}, process.env.SOSOMINUTES * 60000); */
 
 function log(sender, message) {
 	let date = new Date()
