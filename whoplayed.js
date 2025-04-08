@@ -1,4 +1,5 @@
-const fs = require('fs');
+import fetch from 'node-fetch'
+import fs from 'fs'
 
 function matchesQuery(query, name) {
     if (!name) return
@@ -76,14 +77,14 @@ const fetchVxb = async (query) => {
     const json = await res.json()
     const filterednames = json.reduce((acc, game) => {
         if (matchesQuery(query, game.Title) 
-	    && !game.Title.includes('[Subset') 
-	    && !game.Title.startsWith('~')) {
-	    if (Number.isInteger(game.MaxPossible) && Number.isInteger(game.NumAwarded)) {
-		if (game.NumAwarded > (game.MaxPossible * 0.5))
-		    acc.push(game.Title)
-	    } else {
-		acc.push(game.Title)
-	    }
+            && !game.Title.includes('[Subset') 
+            && !game.Title.startsWith('~')) {
+            if (Number.isInteger(game.MaxPossible) && Number.isInteger(game.NumAwarded)) {
+                if (game.NumAwarded > (game.MaxPossible * 0.5))
+                    acc.push(game.Title)
+            } else {
+                acc.push(game.Title)
+            }
         }
         return acc
     }, [])
@@ -97,11 +98,11 @@ const fetchVxb = async (query) => {
 const fetchLamech = async (query) => {
     const filepath = './whoplayed/lamech.json'
     
-    const json = require(filepath)
-    if (!json) {
+    if (!fs.existsSync(filepath)) {
         console.log(`whoplayed: file ${filepath} could not be found or opened`)
-	return
+	    return
     }
+    const json = JSON.parse(fs.readFileSync(filepath, 'utf8'))
 
     const filterednames = json.reduce((acc, name) => {
         if (matchesQuery(query, name)) {
@@ -131,4 +132,4 @@ async function whoPlayed(query) {
     return res
 }
 
-module.exports = whoPlayed
+export { whoPlayed }

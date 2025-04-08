@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "discord",
   "version": "1.0.0",
   "description": "link",
@@ -10,10 +11,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cheerio": "^1.0.0-rc.10",
     "csv-parser": "^3.2.0",
     "discord.js": "^12.5.3",
     "dotenv": "^8.6.0",
+    "node-fetch": "^3.3.2",
     "request": "^2.88.2"
   },
   "repository": {
