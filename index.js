@@ -7,10 +7,13 @@ require('dotenv').config()
 const words = require('./words.json')
 const wichtel = require('./wichtel.json')
 
+const whoplayed = require('./whoplayed')
+
 let tahc
 let logi = 0
 const scaruffi = new RegExp('beatles', 'i')
 const beatles = new RegExp('scaruffi', 'i')
+const matosis = new RegExp('matosis', 'i')
 const me = new RegExp('(^| )link([-,!.? ]|$)','i')
 
 let last_soso = -1
@@ -34,6 +37,12 @@ let pollChannel = null
 /* let sosotimeout = setInterval(() => {
 	getSoSo()
 }, process.env.SOSOMINUTES * 60000); */
+
+function truncateForCharacterLimit(str) {
+	if (str.length > 2000)
+		return str.substring(0,1997) + "..."
+	return str
+}
 
 function log(sender, message) {
 	let date = new Date()
@@ -119,7 +128,7 @@ function search_pics(message,query) {
 					if (result_data.length > 1) {
 						let joined = result_data.join(", ")
 						if (joined.length >= 2000) {
-							joined = joined.substring(0,1997) + "..."
+							joined = truncateForCharacterLimit(joined)
 						}
 						message.channel.send(joined)
 					} else if (result_data.length == 1) {
@@ -142,7 +151,7 @@ function check_remind_mes() {
 	let remind_me_queue = []
     for (let remind_me of saved_remind_mes) {
 		let remaining_ms = remind_me["end_date"] - Date.now()
-		if (remaining_ms < 5000) {
+		if (remaining_ms < 60000) {
 			remind_me_queue.push(remind_me)
 		}
 	}
@@ -154,7 +163,7 @@ function check_remind_mes() {
 			write_remind_mes_to_file()
 		}
 	}
-	setTimeout(check_remind_mes, 5000)
+	setTimeout(check_remind_mes, 60000)
 }
 
 function write_remind_mes_to_file() {
@@ -328,19 +337,11 @@ function sendHelpMessage(channel) {
 		"`!bild suchbegriff` - Sucht nach einem Bild in /chat/.\n" +
         "`!sag [...]` - Sag mir, was ich sagen soll.\n" +
 		"`!wichtel` (nur DM) - Welche Figur wurde mir zugeordnet?\n" + 
+		"`!whoplayed spiel`/`!wp spiel` - Wer hat [spiel] gespielt?\n" +
         "__RemindMe:__\n" +
         "`!remindme 2h [nachricht]` - Erinnert dich in 2 Stunden an [nachricht] (`y, M, w, d, h, m` möglich)\n" +
         "`!remindme 20:15 [nachricht]` - Erinnert dich um 20:15 Uhr an [nachricht]\n" +
-        "`!remindme 31.10.23-13:37 [nachricht]` - Erinnert dich am 31.10.2023 um 13:37 Uhr an [nachricht]\n" +
-		"__Umfragen:__\n" +
-		"`!poll` - Zeige den Stand der aktuellen Umfrage an.\n" +
-		"`!poll new` - Erstelle eine neue Umfrage (`!poll new Frage; Antwort 1; Antwort 2; ...`)\n" +
-		"`!poll new 2:5 ...` - Multiple-Choice-Umfrage mit mindestens 2 und maximal 5 Stimmen pro Teilnehmer\n" +
-		"`!poll end` - Beende die aktuelle Umfrage und zeige die Ergebnisse an.\n" +
-		"`!poll A` - Stimme für Antwort A ab.\n" +
-		"`!poll unvote` - Ziehe alle von dir abgegebenen Stimmen zurück.\n" +
-		"`!poll extend` - Verlängere die Umfrage um 24 Stunden, ab jetzt.\n" +
-		"Umfragen laufen nach 24 Stunden automatisch ab. Um anonym abzustimmen, verwende die Befehle im privaten Chat mit mir."
+        "`!remindme 31.10.23-13:37 [nachricht]` - Erinnert dich am 31.10.2023 um 13:37 Uhr an [nachricht]\n"
 	)
 }
 
@@ -454,17 +455,18 @@ function endPoll(creatorEnded) {
 bot.on("ready", () => {
 	bot.users.fetch(process.env.EVIL).then(user => { user.send("hi") })
 	bot.channels.fetch(process.env.TAHCID).then(channel => { tahc = channel })
-	fs.readFile("/tmp/lastValues.json", (err, data) => {
-		if (err) { console.log(`fs.readFile: ${err} (Starting fresh)`) }
-		else {
-			const json_data = JSON.parse(data)
-			last_soso = json_data.soso
-		}
-	})
+	//fs.readFile("/tmp/lastValues.json", (err, data) => {
+		//if (err) { console.log(`fs.readFile: ${err} (Starting fresh)`) }
+		//else {
+			//const json_data = JSON.parse(data)
+			//last_soso = json_data.soso
+		//}
+	//})
     fs.readFile("/tmp/remindMes.json", (err, data) => {
         if (err) { console.log(`fs.readFile: ${err} (Starting fresh)`) }
 		else {
             saved_remind_mes = JSON.parse(data)
+            log("ready", `${saved_remind_mes.length} remindmes are currently active`)
             check_remind_mes()
         }
     })
@@ -554,7 +556,7 @@ bot.on("message", async message => {
 			const organisator_id = wichtel["organisator"]
 			const organisator = ids[organisator_id]
 			if (message.channel.type == "dm") {
-				fs.readFile("wichtel_secret.json", (err, data) => {
+				fs.readFile("/home/pi/wichtel_secret.json", (err, data) => {
 					if (err) {
 						if (err.code == "ENOENT")
 							message.reply(`Es liegt aktuell keine Zuordnung von Usern und Figuren vor. (ENOENT)`)
@@ -575,7 +577,7 @@ bot.on("message", async message => {
 			} else {
 				if (message.author.id == organisator_id) {
 					const usage_hint = "Befehl: `!wichtel player1, player2, ..., figur1, figur2, ...`"
-					const wichtelMessage = message.content.substring(10)
+					const wichtelMessage = message.content.replace(/^!wichtel/, "").trim();
 					const args = wichtelMessage.split(",").map(str => str.trim())
 					if (args.length < 4) {
 						message.channel.send(`Es müssen mindestens zwei Leute teilnehmen! ${usage_hint}`)
@@ -638,7 +640,7 @@ bot.on("message", async message => {
 						json_output[final_constells[i][0]] = figures[i]
 					}
 					const jsondata = JSON.stringify(json_output)
-					fs.writeFile('wichtel_secret.json', jsondata, (err) => {
+					fs.writeFile('/home/pi/wichtel_secret.json', jsondata, (err) => {
 						if (err) {
 							log("wichtel", err)
 						} else {
@@ -821,6 +823,15 @@ bot.on("message", async message => {
 					message.reply("es läuft momentan keine umfrage. erstelle eine neue mit `!poll new Frage; Antwort A; Antwort B; Antwort C; ...` (achtung: semikolon!)")
 				}
 			}
+		} else if (message.content.startsWith('!whoplayed') || message.content.startsWith('!wp')) {
+			let splitmsg = message.content.split(" ")
+			if (splitmsg.length > 1) {
+				splitmsg.shift()
+				let query = splitmsg.join(" ").trim()
+				let res = await whoplayed(query)
+				if (res)
+					message.channel.send(truncateForCharacterLimit(res))
+			}
 		}
 		else {
 			sendHelpMessage(message.channel)
@@ -838,9 +849,14 @@ bot.on("message", async message => {
 			await setTimeout(() => { message.channel.send(linkquotes[aany]) },2000)
 		}
 		if (beatles.test(message.content)) {
-			const piedo = new MessageAttachment("https://i.imgur.com/RLbYJlv.png")
+			const piedo = new MessageAttachment("https://3v1l.bplaced.net/stuff/scariffo.png")
 			await message.channel.send(words.scaruffi) 
 			await message.channel.send(piedo)
+		}
+		if (matosis.test(message.content)) {
+			const matosispic = new MessageAttachment("https://3v1l.bplaced.net/stuff/matosis.jpg")
+			await message.channel.send(matosispic)
+			await message.channel.send(words.matosis) 
 		}
 		if (message.content === "schön für dich") {
 			message.channel.send(words.zocker)
