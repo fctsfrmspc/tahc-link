@@ -120,7 +120,8 @@ function check_remind_mes() {
 
 function write_remind_mes_to_file() {
 	try {
-		fs.writeFileSync('remindMes.json', JSON.stringify(saved_remind_mes))
+		fs.writeFileSync(process.env.REMINDMES_PATH, JSON.stringify(saved_remind_mes))
+		log("write_remind_mes_to_file", `wrote remindmes to "${process.env.REMINDMES_PATH}"`)
 		log("write_remind_mes_to_file", `${saved_remind_mes.length} remindmes are currently active`)
 	} catch (err) {
 		log("write_remind_mes_to_file", err)
@@ -211,7 +212,7 @@ function convert_milliseconds_to_fulltext(start_ms, end_ms) {
 		const values = [d.getUTCHours(), d.getUTCMinutes()]
 		const names = [["stunde", "n"], ["minute", "n"]]
 		let words = []
-		for (i = 0; i < values.length; i++) {
+		for (let i = 0; i < values.length; i++) {
 			const value = values[i]
 			if (value) {
 				if (value > 1) {
@@ -251,7 +252,7 @@ bot.on("ready", () => {
 	bot.users.fetch(process.env.EVIL).then(user => { user.send("hi") })
 	bot.channels.fetch(process.env.TAHCID).then(channel => { tahc = channel })
 
-    fs.readFile("remindMes.json", (err, data) => {
+    fs.readFile(process.env.REMINDMES_PATH, (err, data) => {
         if (err) { console.log(`fs.readFile: ${err} (Starting fresh)`) }
 		else {
             saved_remind_mes = JSON.parse(data)
@@ -345,7 +346,7 @@ bot.on("message", async message => {
 			const organisator_id = wichtel["organisator"]
 			const organisator = ids[organisator_id]
 			if (message.channel.type == "dm") {
-				fs.readFile("/home/pi/wichtel_secret.json", (err, data) => {
+				fs.readFile(process.env.WICHTEL_SECRET_PATH, (err, data) => {
 					if (err) {
 						if (err.code == "ENOENT")
 							message.reply(`Es liegt aktuell keine Zuordnung von Usern und Figuren vor. (ENOENT)`)
@@ -429,11 +430,11 @@ bot.on("message", async message => {
 						json_output[final_constells[i][0]] = figures[i]
 					}
 					const jsondata = JSON.stringify(json_output)
-					fs.writeFile('/home/pi/wichtel_secret.json', jsondata, (err) => {
+					fs.writeFile(process.env.WICHTEL_SECRET_PATH, jsondata, (err) => {
 						if (err) {
 							log("wichtel", err)
 						} else {
-							log("wichtel", `Successfully wrote to "wichtel_secret.json"`)
+							log("wichtel", `Successfully wrote to "${process.env.WICHTEL_SECRET_PATH}"`)
 						}
 					})
 					message.author.send(stream_output)
@@ -464,7 +465,7 @@ bot.on("message", async message => {
 		}
 		if (me.test(message.content)) {
 			let linkquotes = words.link
-			let aany = rando(linkquotes.length,0)
+			let aany = rando(linkquotes.length-1,0)
 			setTimeout(() => { message.channel.send(linkquotes[aany]) },2000)
 		}
 		if (beatles.test(message.content)) {

@@ -30,7 +30,7 @@ const fetchEvil = async (query) => {
 }
 
 const fetchFrabbs = async (query) => {
-    const url = 'https://us-central1-businessdog-70c32.cloudfunctions.net/getGameRatings'
+    const url = 'https://www.businessdog.at/api/games'
    
     const res = await fetch(url)
     console.log(`whoplayed: response from ${url}: status ${res.status} ${res.statusText}`)
