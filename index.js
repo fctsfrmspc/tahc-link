@@ -181,23 +181,38 @@ function search_pics(message,query) {
 
 // Remind mes
 
-function check_remind_mes() {
-	let remind_me_queue = []
-    for (let remind_me of saved_remind_mes) {
-		let remaining_ms = remind_me["end_date"] - Date.now()
-		if (remaining_ms < 60000) {
-			remind_me_queue.push(remind_me)
-		}
+const MAX_REMIND_ME_TIMEOUT = 2147483647 // Node's maximum delay: ~24.85 days
+let remind_me_timeout = null
+
+function schedule_next_reminder() {
+	clearTimeout(remind_me_timeout)
+	remind_me_timeout = null
+
+	if (saved_remind_mes.length === 0) return
+
+	saved_remind_mes.sort((a, b) => a.end_date - b.end_date)
+	const remaining_ms = saved_remind_mes[0].end_date - Date.now()
+	// Long reminders wake up in chunks; always recheck their absolute deadline.
+	const delay = Math.max(0, Math.min(remaining_ms, MAX_REMIND_ME_TIMEOUT))
+	remind_me_timeout = setTimeout(process_due_reminders, delay)
+}
+
+function process_due_reminders() {
+	const now = Date.now()
+	let due = []
+
+	while (saved_remind_mes.length > 0 && saved_remind_mes[0].end_date <= now) {
+		due.push(saved_remind_mes.shift())
 	}
-	for (let remind_me of remind_me_queue) {
+
+	for (let remind_me of due) {
 		remind(remind_me)
-		let index = saved_remind_mes.indexOf(remind_me)
-		if (index > -1) {
-			saved_remind_mes.splice(index, 1)
-			write_remind_mes_to_file()
-		}
 	}
-	setTimeout(check_remind_mes, 60000)
+	if (due.length > 0) {
+		write_remind_mes_to_file()
+	}
+
+	schedule_next_reminder()
 }
 
 function write_remind_mes_to_file() {
@@ -343,8 +358,8 @@ bot.on("ready", () => {
 		else {
             saved_remind_mes = JSON.parse(data)
             log("ready", `${saved_remind_mes.length} remindmes are currently active`)
-            check_remind_mes()
         }
+        schedule_next_reminder()
     })
 })
 
@@ -410,8 +425,8 @@ bot.on("message", async message => {
                 sendHelpMessage(message.channel)
                 return
             }
-            if (saved_remind_mes.length > 9) {
-                message.reply("sorry, es können nur 10 reminder gleichzeitig aktiv sein")
+            if (saved_remind_mes.length >= 1000) {
+                message.reply("sorry, es können nur 1000 reminder gleichzeitig aktiv sein")
                 return
             }
             const remind_date = splitmsg[1]
@@ -429,17 +444,10 @@ bot.on("message", async message => {
             saved_remind_mes.push(new_remindme)
             // save
             write_remind_mes_to_file()
+            schedule_next_reminder()
             
 			message.reply(`ok, ich erinner dich ${remind_date_text}`)
 			
-			/*
-			 * upper limit of timeout for setTimeout/setInterval is 2^32
-			 * (roughly 24 days and 20 hours in ms)
-			 * bot will save the reminder, but only start the timeout once
-			 * its below the limit. problem: the bot checks this only once
-			 * during start. so if the bot is not reset during that time,
-			 * the reminder will never be sent...
-			 * */
         }
 		else if (message.content.startsWith('!wichtel')) {
 			const ids = wichtel["ids"]
