@@ -1,4 +1,4 @@
-import { Client, MessageAttachment } from 'discord.js'
+import { Client, MessageAttachment, User } from 'discord.js'
 const bot = new Client()
 import fs from 'fs'
 import request from 'request'
@@ -8,10 +8,12 @@ import dotenv from 'dotenv'
 import words from './words.json' assert { type: 'json' }
 import wichtel from './wichtel.json' assert { type: 'json' };
 import { whoPlayed } from './whoplayed.js'
+import { readWordle } from './wordle.js'
 
 dotenv.config()
 
 let tahc
+let evil
 let logi = 0
 const scaruffi = new RegExp('beatles', 'i')
 const beatles = new RegExp('scaruffi', 'i')
@@ -28,10 +30,13 @@ function truncateForCharacterLimit(str) {
 	return str
 }
 
-function log(sender, message) {
+function log(sender, message, userToDm) {
 	let date = new Date()
 	console.log(`[${logi}] ${date.toUTCString()}, from ${sender}: ${message}`)
 	logi++
+	if (userToDm instanceof User) {
+		userToDm.send(message)
+	}
 }
 
 function rando(max,min) {
@@ -48,6 +53,83 @@ function shuffle(array) {
         array[index] = temp
     }
     return array
+}
+
+const namesForWordle = {
+	"228211267721101312": "The Turt"
+}
+
+async function processWordleResults(message) {
+	const messageContent = message.content;
+	const timestamp = message.createdTimestamp;
+	const date = new Date(timestamp);
+	const dateStr = String(date.getDate()).padStart(2, '0') + '.' + 
+	                String(date.getMonth() + 1).padStart(2, '0') + '.' + 
+	                date.getFullYear();
+	
+	// Check if message contains "results:"
+	if (!/results:/i.test(messageContent)) {
+		return;
+	}
+	
+	// Determine if it's yesterday's results
+	const isYesterday = /yesterday/i.test(messageContent);
+	let resultDate = dateStr;
+	
+	if (isYesterday) {
+		const yesterday = new Date(timestamp - 86400000);
+		resultDate = String(yesterday.getDate()).padStart(2, '0') + '.' + 
+		            String(yesterday.getMonth() + 1).padStart(2, '0') + '.' + 
+		            yesterday.getFullYear();
+	}
+	
+	// Parse results - look for pattern like "3/6: @Username"
+	const resultRegex = /([0-9X])\/6:\s*(.*)/gi;
+	let match;
+	const results = [];
+	
+	while ((match = resultRegex.exec(messageContent)) !== null) {
+		const attemptStr = match[1].toUpperCase();
+		const attempts = (attemptStr === 'X') ? 7 : parseInt(attemptStr);
+		const usernamePart = match[2];
+		
+		// Extract all usernames from this line
+		const usernames = usernamePart.match(/@([A-Za-z0-9_]+(?:\s+[A-Za-z0-9_]+)*)/g);
+		if (usernames) {
+			for (let username of usernames) {
+				// Remove @ and trim
+				username = username.substring(1).trim();
+				
+				// When the user is linked in the post, only their id is displayed (<@id>)
+				if (username.match(/[0-9]{18,}/)) {
+					if (namesForWordle.hasOwnProperty(username)) {
+						username = namesForWordle[username]
+					} else {
+						let userFromId = await message.guild.members.fetch(username)
+						if (!userFromId || !userFromId.displayName) {
+							log("processWordleResults", `Could not get user from id ${username}`, evil)
+							continue
+						}
+						username = userFromId.displayName
+					}
+				}
+				results.push([resultDate, username, attempts]);
+			}
+		}
+	}
+	
+	// Append to CSV file
+	if (results.length > 0) {
+		const csvPath = '../wordle_results.csv';
+		const csvLine = results.map(r => `${r[0]},${r[1]},${r[2]}`).join('\n') + '\n';
+		
+		try {
+			fs.appendFileSync(csvPath, csvLine);
+			log("processWordleResults", `Appended ${results.length} results to ${csvPath}`);
+		} catch (err) {
+			log("processWordleResults", `Error appending to CSV: ${err}`);
+		}
+	}
 }
 
 function search_pics(message,query) {
@@ -195,8 +277,12 @@ function convert_remind_date_to_milliseconds(now, date_text) {
         let [hours, minutes] = matched.slice(1)
         hours = Math.min(23, hours)
         minutes = Math.min(59, minutes)
-        let d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes)
-        return d.valueOf()
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes)
+        let ms = d.valueOf()
+		if (now.getHours() > hours) { // !remindme 1:00 but it's 23:00
+			ms += 86400000
+		}
+		return ms
     } else {
 		return NaN
 	}
@@ -235,7 +321,7 @@ function sendHelpMessage(channel) {
 	channel.send(
 		"__Verfügbare Kommandos:__\n" +
 		"`!roll` - Zufällige Zahl zwischen 1 und 6\n" +
-		"`!roll int x, int y` - Zufäige Zahl zwischen x und y\n" +
+		"`!roll int x, int y` - Zufällige Zahl zwischen x und y\n" +
 		"`!roll str a, str b, str c...` - Zufälliger String\n" +
 		"`!bild suchbegriff` - Sucht nach einem Bild in /chat/.\n" +
         "`!sag [...]` - Sag mir, was ich sagen soll.\n" +
@@ -249,7 +335,7 @@ function sendHelpMessage(channel) {
 }
 
 bot.on("ready", () => {
-	bot.users.fetch(process.env.EVIL).then(user => { user.send("hi") })
+	bot.users.fetch(process.env.EVIL).then(user => { evil = user; evil.send("hi"); })
 	bot.channels.fetch(process.env.TAHCID).then(channel => { tahc = channel })
 
     fs.readFile(process.env.REMINDMES_PATH, (err, data) => {
@@ -264,12 +350,26 @@ bot.on("ready", () => {
 
 bot.login(process.env.TOKEN)
 
+const ggbot_commands = [ "!wa", "!hltb", "!hlta", "!hltw", "!ww" ]
+function is_ggbot_command(command) {
+	for (let ggcommand of ggbot_commands) {
+		if (command.startsWith(ggcommand)) {
+			return true
+		}
+	}
+	return false
+}
+
 bot.on("message", async message => {
-	if (message.author.bot) return;
+	if (message.author.id == process.env.LINK) return;
+	
 	if (message.content.startsWith('!')) {
 		if (message.content.startsWith('!sag')) {
 			const saymessage = message.content.substring(4)
 			tahc.send(saymessage)
+		}
+		else if (is_ggbot_command(message.content)) {
+			// ignore, handled by other bot
 		}
 		else if (message.content.startsWith('!roll')) {
 			const rollmessage = message.content.substring(5)
@@ -400,10 +500,9 @@ bot.on("message", async message => {
 					const MAX_ITER = 999
 					let i = 1
 					let successful = false
-					let final_constells
+					let final_constells = []
 					while (!successful) {
-						final_constells = []
-						backup_players = [[...players], [...players]]
+						let backup_players = [[...players], [...players]]
 						all_constells = shuffle(all_constells)
 						for (let constell of all_constells) {
 							if (backup_players[0].includes(constell[0]) && backup_players[1].includes(constell[1])) {
@@ -452,34 +551,49 @@ bot.on("message", async message => {
 				if (res)
 					message.channel.send(truncateForCharacterLimit(res))
 			}
+		} else if (message.content.startsWith('!word')) {
+			const wordleRes = readWordle()
+			if (wordleRes) {
+				message.channel.send(wordleRes)
+			}
 		}
 		else {
-			sendHelpMessage(message.channel)
+			if (/^!{2,}$/.test(message.content)) {
+				// ignore
+			} else {
+				sendHelpMessage(message.channel)
+			}
 		}
 	} else {
-		if (scaruffi.test(message.content)) {
-			let scaruffiwords = words.beatles
-			for (let paragraph of scaruffiwords) {
-				await message.channel.send(paragraph)
+		if (message.channel == tahc) {
+			if (beatles.test(message.content)) {
+				const piedo = new MessageAttachment("https://3v1l.bplaced.net/stuff/scariffo.png")
+				await message.channel.send(words.scaruffi) 
+				await message.channel.send(piedo)
 			}
+			if (matosis.test(message.content)) {
+				const matosispic = new MessageAttachment("https://3v1l.bplaced.net/chat/schwanzlutschen2025.png")
+				await message.channel.send(matosispic)
+				await message.channel.send(words.matosis) 
+			}
+			if (scaruffi.test(message.content)) {
+				let scaruffiwords = words.beatles
+				for (let paragraph of scaruffiwords) {
+					await message.channel.send(paragraph)
+				}
+			}
+			if (message.content === "schön für dich") {
+				message.channel.send(words.zocker)
+			}
+		}
+		else if (message.channel.id == process.env.WORDLEID && message.author.id == process.env.WORDLEBOT) {
+			processWordleResults(message)
+			return
 		}
 		if (me.test(message.content)) {
 			let linkquotes = words.link
 			let aany = rando(linkquotes.length-1,0)
 			setTimeout(() => { message.channel.send(linkquotes[aany]) },2000)
 		}
-		if (beatles.test(message.content)) {
-			const piedo = new MessageAttachment("https://3v1l.bplaced.net/stuff/scariffo.png")
-			await message.channel.send(words.scaruffi) 
-			await message.channel.send(piedo)
-		}
-		if (matosis.test(message.content)) {
-			const matosispic = new MessageAttachment("https://3v1l.bplaced.net/stuff/matosis.jpg")
-			await message.channel.send(matosispic)
-			await message.channel.send(words.matosis) 
-		}
-		if (message.content === "schön für dich") {
-			message.channel.send(words.zocker)
-		}
 	}
-});
+}); 
